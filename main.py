@@ -35,11 +35,26 @@ class Collector:
     
     def run_pipeline(self):
         hotel_links = self.get_hotels()
+        hotel_final_data = []
         for hotel_link in hotel_links:
-            hotel_session = requests.Session()
             date_options = []
             departure_options = []
             hotel_name = hotel_link.split("/")[-2]
+            hotel_info = {
+                "hotel_url": hotel_link,
+                "hotel_name": "",
+                "hotel_stars": "",
+                "room_name": "",
+                "meal_plan": "",
+                "duration": "",
+                "departure_airport": "",
+                "flight_departure_time": "",
+                "flight_arrival_time": "",
+                "flight_airline": "",
+                "final_price_per_person": "",
+                "tourist_tax": "",
+            }
+            hotel_session = requests.Session()
             # hotel_details = self.session.get(hotel_link)
             # quit()
             time.sleep(5)
@@ -60,6 +75,10 @@ class Collector:
             date_options = [option["value"] for option in get_date_options if option["value"] != ""]
             departure_options = [input["value"] for input in get_departure_options if input["value"] != ""]
             payload_extension = self.get_masterdata_id(price_grid_soup)
+            hotel_basic_info = self.get_hotel_basic_info(price_grid_soup)
+            hotel_info.update(hotel_basic_info)
+            print(hotel_info)
+            # quit()
             for departure_option in departure_options:
                 price_payload = f"DepartureFrom={departure_option}&DepartureDate={date_options[1]}&IsSale=false&Destination=Spanje&Entity=-1_{payload_extension}"
                 print(price_payload)
@@ -99,6 +118,22 @@ class Collector:
             time.sleep(5)
 
 
+    def get_hotel_basic_info(self, hotel_soup):
+        hotel_info = {
+            "hotel_name": "",
+            "hotel_stars": "",
+        }
+        hotel_info_container = hotel_soup.find("div", class_="ttl2")
+        if not hotel_info_container:
+            return hotel_info
+        hotel_name = hotel_info_container.find("h1").get_text().strip()
+        star_elements = hotel_info_container.find_all("span")[1]
+        print(star_elements)
+        hotel_stars = star_elements["class"][1].replace("star", "")[0]
+        hotel_info["hotel_name"] = hotel_name
+        hotel_info["hotel_stars"] = hotel_stars
+        return hotel_info
+
     def get_hotel_cookies(self, hotel_link):
         with Camoufox(humanize=True) as browser:
             context = browser.new_context(
@@ -107,11 +142,11 @@ class Collector:
             )
             page = context.new_page()
             page.goto(hotel_link)
-            time.sleep(10)
             page.wait_for_selector("#pricegrid", state="attached")
             page.locator("#pricegrid").scroll_into_view_if_needed()
             page.wait_for_selector("#prijzen", state="visible")
             page.locator("#prijzen").scroll_into_view_if_needed()
+            time.sleep(5)
              # get cookies
             cookies = context.cookies()
             # Convert cookies (list of dicts) to cookie string
