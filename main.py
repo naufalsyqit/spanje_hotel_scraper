@@ -120,10 +120,16 @@ class Collector:
             return cookie_string, html
 
     def get_hotels(self):
-        resp = self.session.get(self.target_url)
-        resp_soup = BeautifulSoup(resp.text, "lxml")
-        print(resp.text)
-        hotel_list = resp_soup.find_all("div", class_="sr-acco")
+        i = 0
+        impersonation = ["chrome", "firefox", "edge", "safari"]
+        while i < len(impersonation):
+            resp = self.session.get(self.target_url)
+            resp_soup = BeautifulSoup(resp.text, "lxml")
+            hotel_list = resp_soup.find_all("div", class_="sr-acco")
+            if hotel_list:
+                break
+            self.session.impersonate = impersonation[i]
+            i += 1
         hotel_links = []
         for hotel in hotel_list:
             hotel_link = hotel.find("a")["href"]
@@ -131,8 +137,6 @@ class Collector:
         print(hotel_links)
         # print(len(hotel_list))
         return hotel_links
-        return hotel_list
-        return resp.text
 
 
     def get_masterdata_id(self, hotel_soup):
