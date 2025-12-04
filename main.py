@@ -146,7 +146,7 @@ class Collector:
             page.locator("#pricegrid").scroll_into_view_if_needed()
             page.wait_for_selector("#prijzen", state="visible")
             page.locator("#prijzen").scroll_into_view_if_needed()
-            time.sleep(5)
+            time.sleep(2)
              # get cookies
             cookies = context.cookies()
             # Convert cookies (list of dicts) to cookie string
