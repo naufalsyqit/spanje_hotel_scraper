@@ -10,23 +10,7 @@ class Collector:
     def __init__(self):
         self.base_url = "https://www.tui.nl"
         self.target_url = "https://www.tui.nl/reizen/spanje/formentera/"
-        # self.headers = {
-        #     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        #     'accept-language': 'en-US,en;q=0.9',
-        #     'cache-control': 'max-age=0',
-        #     'priority': 'u=0, i',
-        #     'sec-ch-ua': '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
-        #     'sec-ch-ua-mobile': '?0',
-        #     'sec-ch-ua-platform': '"Windows"',
-        #     'sec-fetch-dest': 'document',
-        #     'sec-fetch-mode': 'navigate',
-        #     'sec-fetch-site': 'same-origin',
-        #     'sec-fetch-user': '?1',
-        #     'upgrade-insecure-requests': '1',
-        #     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
-        # }
-        proxies={
-        }
+        proxies = {}
         self.session = requests.Session(proxies=proxies)
         self.session.impersonate = "chrome120"
         # print(self.session.get("https://httpbin.org/ip").text)
@@ -106,6 +90,21 @@ class Collector:
                 price_details = hotel_session.post("https://www.tui.nl/data/pricegrid/priceselect/", data=selected_price_payload, headers=headers)
                 with open(f"output/raw_json/{hotel_name}_{departure_option}_price_details.json", "w", encoding="utf-8") as file:
                     json.dump(price_details.json(), file, indent=4)
+
+                price_details_json = price_details.json()
+                g4entry = json.loads(price_details_json["ga4Entry"])["GA4"]["ecommerce"]
+                flight_details = g4entry["items"][1]
+                price_jump = json.loads(price_details_json["priceJump"])["GA4"]["priceJump"]
+                # print(g4entry)
+                # quit()
+                hotel_info["room_name"] = g4entry["items"][0].get("item_variant", "")
+                hotel_info["duration"] = f"{g4entry.get('duration_days', '')} days / {g4entry.get('duration_nights', '')} nights"
+                hotel_info["departure_date"] = g4entry.get("departure_date", "")
+                hotel_info["return_date"] = g4entry.get("return_date", "")
+                hotel_info["flight_departure_time"] = flight_details.get("departure_time_outbound", "")
+                hotel_info["flight_arrival_time"] = flight_details.get("arrival_time_outbound", "")
+                hotel_info["flight_airline"] = price_jump.get("carrier", "")
+                hotel_final_data.append(hotel_info)
                 with open(f"output/raw_html/{hotel_name}_{departure_option}.html", "w", encoding="utf-8") as file:
                     file.write(decoded_price_html)
                 with open(f"output/txt_output/{hotel_name}_{departure_option}.txt", "w", encoding="utf-8") as file:
@@ -116,6 +115,8 @@ class Collector:
             # with open(f"raw_html/{hotel_name}.html", "w", encoding="utf-8") as file:
             #     file.write(hotel_details.text)
             time.sleep(5)
+        with open("output/final_hotel_data.json", "w", encoding="utf-8") as file:
+            json.dump(hotel_final_data, file, indent=4, ensure_ascii=False)
 
 
     def get_hotel_basic_info(self, hotel_soup):
@@ -127,15 +128,23 @@ class Collector:
         if not hotel_info_container:
             return hotel_info
         hotel_name = hotel_info_container.find("h1").get_text().strip()
-        star_elements = hotel_info_container.find_all("span")[1]
-        print(star_elements)
-        hotel_stars = star_elements["class"][1].replace("star", "")[0]
         hotel_info["hotel_name"] = hotel_name
-        hotel_info["hotel_stars"] = hotel_stars
+
+        star_elements = hotel_info_container.find_all("span")
+        if not star_elements:
+            return hotel_info
+        try:
+            hotel_stars = star_elements[1]["class"][1].replace("star", "")[0]
+            hotel_info["hotel_stars"] = hotel_stars
+            hotel_info["accomodation_type"] = "Hotel"
+        except Exception as e:
+            print(f"Error extracting stars for {hotel_name}: {e}")
+            hotel_info["accomodation_type"] = star_elements[0].get_text().strip()
+
         return hotel_info
 
     def get_hotel_cookies(self, hotel_link):
-        with Camoufox(humanize=True) as browser:
+        with Camoufox(humanize=True, headless=True) as browser:
             context = browser.new_context(
                 viewport={"width": 1920, "height": 1080},
                 screen={"width": 1920, "height": 1080}
