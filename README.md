@@ -25,7 +25,7 @@ This project automates the collection of hotel data from TUI Netherlands, includ
 ## Installation
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.11.1
 - pip
 
 ### Setup
@@ -153,8 +153,8 @@ The scraper exports data in the following JSON structure:
     "flight_arrival_time": "14:45",
     "flight_airline": "TUI fly",
     "final_price_per_person": "€1,299",
-    "tourist_tax": "€50",
-    "currency": "EUR"
+    "tourist_tax": "50",
+    "currency": "€"
   }
 ]
 ```
@@ -198,24 +198,24 @@ Failed requests are logged and the pipeline continues processing other hotels.
 ## Performance Tips
 
 1. **Reduce Month Count**: Set `month_count` to a smaller value to speed up scraping
-2. **Limit Hotels**: Modify `hotel_links[:3]` to scrape fewer hotels
+2. **Limit Hotels**: Modify `hotel_links[:count]` to scrape fewer hotels
 3. **Parallel Processing**: Consider using ThreadPoolExecutor for multiple hotels (future enhancement)
 
 ## Limitations
 
-- Currently scrapes only the Formentera destination
+- Currently scrapes only the Formentera destination (if flows are completely the same, it'll just need a modification on the url)
 - Requires active internet connection
 - TUI may have rate limiting - add delays if needed
 - Website structure changes may break the scraper
+- all using 2 person options
+- Meal plan kept greyed out to select
 
 ## Future Enhancements
 
 - [ ] Support for multiple destinations
-- [ ] Parallel hotel processing with ThreadPoolExecutor
+- [ ] Parallel hotel processing with ThreadPoolExecutor (need further inspect on the security as per now rotational IP kept getting blocked)
 - [ ] Database storage option
-- [ ] Email notifications for price drops
-- [ ] Async/await implementation for faster scraping
-- [ ] Proxy support for large-scale scraping
+- [ ] Async/await implementation for camoufox cookies collector
 
 ## Disclaimer
 
