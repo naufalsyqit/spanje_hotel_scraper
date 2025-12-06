@@ -83,17 +83,8 @@ def get_hotel_cookies(hotel_link):
 
 
 def get_departure_options(price_grid_soup):
-    get_date_options = price_grid_soup.find(
-        "select", id="pricegridselectDropdownDepartureDate"
-    )
-    get_date_options = get_date_options.find_all("option")
     get_departure_options = price_grid_soup.find("span", class_="departure-from")
     get_departure_options = get_departure_options.find_all("input")
-    date_options = [
-        {"text": option.text, "value": option["value"]}
-        for option in get_date_options
-        if option["value"] != ""
-    ]
     departure_options = [
         {"name": input.find_next("label").text, "code": input["value"]}
         for input in get_departure_options
