@@ -199,7 +199,7 @@ Failed requests are logged and the pipeline continues processing other hotels.
 
 1. **Reduce Month Count**: Set `month_count` to a smaller value to speed up scraping
 2. **Limit Hotels**: Modify `hotel_links[:count]` to scrape fewer hotels
-3. **Parallel Processing**: Consider using ThreadPoolExecutor for multiple hotels (future enhancement)
+3. **Parallel Processing**: Consider using ThreadPoolExecutor for multiple hotels (future enhancement, needs security measurement)
 
 ## Limitations
 
