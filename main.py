@@ -1,219 +1,52 @@
 import json
 import time
-import html
+import logging
 
-from camoufox.sync_api import Camoufox
 from curl_cffi import requests
 from bs4 import BeautifulSoup
+from extractor.hotel_extractor import (
+    get_trip_options,
+    get_departure_options,
+    get_date_options,
+    get_hotel_basic_info,
+    get_masterdata_id,
+    get_hotel_cookies,
+    get_hotels,
+    get_hotel_price_grid,
+    get_hotel_price_details,
+)
+from pipeline.crawl import Crawl
+from helpers.general_utils import decode_and_soup
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 class Collector:
-    def __init__(self):
+    def __init__(self, month_count=0):
+        logging.info(f"Initializing Collector with month_count={month_count}")
         self.base_url = "https://www.tui.nl"
         self.target_url = "https://www.tui.nl/reizen/spanje/formentera/"
-        proxies = {}
-        self.session = requests.Session(proxies=proxies)
-        self.session.impersonate = "chrome120"
-        # print(self.session.get("https://httpbin.org/ip").text)
-        # inject session with cookies
-        # self.session.get(self.base_url, impersonate="chrome")
-    
+        self.crawl = Crawl(month_count=month_count)
+
     def run_pipeline(self):
-        hotel_links = self.get_hotels()
+        logging.info("Starting pipeline run")
+        logging.info("collect hotel links")
+        hotel_links = get_hotels(self.target_url, self.base_url)
         hotel_final_data = []
         for hotel_link in hotel_links:
-            date_options = []
-            departure_options = []
-            hotel_name = hotel_link.split("/")[-2]
-            hotel_info = {
-                "hotel_url": hotel_link,
-                "hotel_name": "",
-                "hotel_stars": "",
-                "room_name": "",
-                "meal_plan": "",
-                "duration": "",
-                "departure_airport": "",
-                "flight_departure_time": "",
-                "flight_arrival_time": "",
-                "flight_airline": "",
-                "final_price_per_person": "",
-                "tourist_tax": "",
-            }
-            hotel_session = requests.Session()
-            # hotel_details = self.session.get(hotel_link)
-            # quit()
-            time.sleep(5)
-            cookie_string, price_grid_html = self.get_hotel_cookies(hotel_link)
-            print(cookie_string)
-            headers = {
-                'accept': 'application/json, text/javascript, */*; q=0.01',
-                'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
-                'x-requested-with': 'XMLHttpRequest',
-                "Cookie": cookie_string,
-            }
-            price_grid_soup = BeautifulSoup(price_grid_html, "lxml")
-            get_date_options = price_grid_soup.find("select", id="pricegridselectDropdownDepartureDate")
-            get_date_options = get_date_options.find_all("option")
-            get_departure_options = price_grid_soup.find("span", class_="departure-from")
-            get_departure_options = get_departure_options.find_all("input")
-            date_options = [option["value"] for option in get_date_options if option["value"] != ""]
-            departure_options = [input["value"] for input in get_departure_options if input["value"] != ""]
-            payload_extension = self.get_masterdata_id(price_grid_soup)
-            hotel_basic_info = self.get_hotel_basic_info(price_grid_soup)
-            hotel_info.update(hotel_basic_info)
-            print(hotel_info)
-            # quit()
-            for departure_option in departure_options:
-                price_payload = f"DepartureFrom={departure_option}&DepartureDate={date_options[1]}&IsSale=false&Destination=Spanje&Entity=-1_{payload_extension}"
-                print(price_payload)
-                response = hotel_session.post("https://www.tui.nl/data/pricegrid/changepref/", data=price_payload, headers=headers)
-                if response.status_code != 200:
-                    print(f"Failed to fetch price grid for {hotel_name} with departure {departure_option}")
-                    print(response.text)
-                    continue
-                # print(response.text)
-                response_json = response.json()
-                price_html = response_json["pricegrid"]
-                decoded_price_html = html.unescape(price_html)
-                # print(decoded_price_html)
-                # 2. Parse with BeautifulSoup
-                decoded_price_soup = BeautifulSoup(decoded_price_html, "lxml")
-                lowest_price_tag = decoded_price_soup.find("span", string="Laagste")
-                if not lowest_price_tag:
-                    print(f"No lowest price found for {hotel_name} with departure {departure_option}")
-                    continue
-                lowest_price_button = lowest_price_tag.find_parent("button")
-                lowest_price = lowest_price_button.get_text().replace("Laagste", "").strip()
-                price_selection_id = lowest_price_button["rev"]
-                selected_price = f"{lowest_price}+Laagste"
-                selected_price_payload = f"PriceSelectionId={price_selection_id}&SelectedPrice={selected_price}&IsPricePerPerson=True&IsSale=false&Destination=Spanje&Entity=-1_{payload_extension}"
-                price_details = hotel_session.post("https://www.tui.nl/data/pricegrid/priceselect/", data=selected_price_payload, headers=headers)
-                with open(f"output/raw_json/{hotel_name}_{departure_option}_price_details.json", "w", encoding="utf-8") as file:
-                    json.dump(price_details.json(), file, indent=4)
+            hotel_data = self.crawl.crawl_hotels(hotel_link)
+            hotel_final_data.extend(hotel_data)
+        return hotel_final_data
 
-                price_details_json = price_details.json()
-                g4entry = json.loads(price_details_json["ga4Entry"])["GA4"]["ecommerce"]
-                flight_details = g4entry["items"][1]
-                price_jump = json.loads(price_details_json["priceJump"])["GA4"]["priceJump"]
-                # print(g4entry)
-                # quit()
-                hotel_info["room_name"] = g4entry["items"][0].get("item_variant", "")
-                hotel_info["duration"] = f"{g4entry.get('duration_days', '')} days / {g4entry.get('duration_nights', '')} nights"
-                hotel_info["departure_date"] = g4entry.get("departure_date", "")
-                hotel_info["return_date"] = g4entry.get("return_date", "")
-                hotel_info["flight_departure_time"] = flight_details.get("departure_time_outbound", "")
-                hotel_info["flight_arrival_time"] = flight_details.get("arrival_time_outbound", "")
-                hotel_info["flight_airline"] = price_jump.get("carrier", "")
-                hotel_final_data.append(hotel_info)
-                with open(f"output/raw_html/{hotel_name}_{departure_option}.html", "w", encoding="utf-8") as file:
-                    file.write(decoded_price_html)
-                with open(f"output/txt_output/{hotel_name}_{departure_option}.txt", "w", encoding="utf-8") as file:
-                    file.write(f"Hotel: {hotel_name}, Departure: {departure_option}, Lowest Price: {lowest_price if lowest_price else 'N/A'}, Price Selection ID: {price_selection_id}, selected_price: {selected_price}")
-                print(f"Hotel: {hotel_name}, Departure: {departure_option}, Lowest Price: {lowest_price if lowest_price else 'N/A'}, Price Selection ID: {price_selection_id}, selected_price: {selected_price}")
-                time.sleep(5)
-                # quit()
-            # with open(f"raw_html/{hotel_name}.html", "w", encoding="utf-8") as file:
-            #     file.write(hotel_details.text)
-            time.sleep(5)
-        with open("output/final_hotel_data.json", "w", encoding="utf-8") as file:
-            json.dump(hotel_final_data, file, indent=4, ensure_ascii=False)
-
-
-    def get_hotel_basic_info(self, hotel_soup):
-        hotel_info = {
-            "hotel_name": "",
-            "hotel_stars": "",
-        }
-        hotel_info_container = hotel_soup.find("div", class_="ttl2")
-        if not hotel_info_container:
-            return hotel_info
-        hotel_name = hotel_info_container.find("h1").get_text().strip()
-        hotel_info["hotel_name"] = hotel_name
-
-        star_elements = hotel_info_container.find_all("span")
-        if not star_elements:
-            return hotel_info
-        try:
-            hotel_stars = star_elements[1]["class"][1].replace("star", "")[0]
-            hotel_info["hotel_stars"] = hotel_stars
-            hotel_info["accomodation_type"] = "Hotel"
-        except Exception as e:
-            print(f"Error extracting stars for {hotel_name}: {e}")
-            hotel_info["accomodation_type"] = star_elements[0].get_text().strip()
-
-        return hotel_info
-
-    def get_hotel_cookies(self, hotel_link):
-        with Camoufox(humanize=True, headless=True) as browser:
-            context = browser.new_context(
-                viewport={"width": 1920, "height": 1080},
-                screen={"width": 1920, "height": 1080}
-            )
-            page = context.new_page()
-            page.goto(hotel_link)
-            page.wait_for_selector("#pricegrid", state="attached")
-            page.locator("#pricegrid").scroll_into_view_if_needed()
-            page.wait_for_selector("#prijzen", state="visible")
-            page.locator("#prijzen").scroll_into_view_if_needed()
-            time.sleep(2)
-             # get cookies
-            cookies = context.cookies()
-            # Convert cookies (list of dicts) to cookie string
-            cookie_string = "; ".join([f"{cookie['name']}={cookie['value']}" for cookie in cookies])
-            html = page.content()
-            return cookie_string, html
-
-    def get_hotels(self):
-        i = 0
-        impersonation = ["chrome", "firefox", "edge", "safari"]
-        while i < len(impersonation):
-            resp = self.session.get(self.target_url)
-            resp_soup = BeautifulSoup(resp.text, "lxml")
-            hotel_list = resp_soup.find_all("div", class_="sr-acco")
-            if hotel_list:
-                break
-            self.session.impersonate = impersonation[i]
-            i += 1
-        hotel_links = []
-        for hotel in hotel_list:
-            hotel_link = hotel.find("a")["href"]
-            hotel_links.append(f"{self.base_url}{hotel_link}")
-        print(hotel_links)
-        # print(len(hotel_list))
-        return hotel_links
-
-
-    def get_masterdata_id(self, hotel_soup):
-        price_grid_section = hotel_soup.find("section", class_="pricegrid")
-        target_element = price_grid_section.find("section", class_="wd-remove")
-        master_entity_type = target_element["data-viewedobjectmasterdatatype"]
-        master_entity_id = target_element["data-viewedobjectmasterdataid"]
-        # data = {
-        #     'masterentitytype': master_entity_type,
-        #     'masterentityid': master_entity_id,
-        #     'theme': '-1',
-        #     'isSale': 'false',
-        #     'destination': 'Spanje',
-        #     'firstview': 'true',
-        # }
-        payload = f"{master_entity_type}_{master_entity_id}"
-        return payload
-
-
-    def scroll_to_bottom(self, page, pause=800):
-        last_height = page.evaluate("document.body.scrollHeight")
-        while True:
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            page.wait_for_timeout(pause)
-            new_height = page.evaluate("document.body.scrollHeight")
-            if new_height == last_height:
-                break
-            last_height = new_height
 
 if __name__ == "__main__":
-    collector = Collector()
-    collector.run_pipeline()
-    # hotel_list = collector.get_hotels()
-    # with open("raw.json", "w", encoding="utf-8") as file:
-    #     # file.write(hotel_list)
-    #     json.dump(hotel_list, file, indent=4)
+    month_count = 2  # Set to 0 to scrape all months
+    collector = Collector(month_count=month_count)
+    hotel_final_data = collector.run_pipeline()
+
+    with open(
+        f"output/final_hotel_data_{month_count}_months.json", "w", encoding="utf-8"
+    ) as file:
+        json.dump(hotel_final_data, file, indent=4, ensure_ascii=False)
