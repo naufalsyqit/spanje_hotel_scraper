@@ -17,9 +17,6 @@ from extractor.hotel_extractor import (
 )
 from helpers.general_utils import decode_and_soup
 
-# logging.basicConfig(
-#     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-# )
 
 class Crawl:
     def __init__(self, month_count=0):
@@ -124,6 +121,7 @@ class Crawl:
                 #     file.write(decoded_price_soup.prettify())
                 # with open(f"output/txt_output/{hotel_name}_{departure_option['code']}_{date_option['text'].strip()}.txt", "w", encoding="utf-8") as file:
                 #     file.write(f"Hotel: {hotel_name}, Departure: {departure_option['code']}, Lowest Price: {lowest_price if lowest_price else 'N/A'}, Price Selection ID: {price_selection_id}, selected_price: {selected_price}")
+
                 logging.info(
                     f"Hotel: {hotel_name}, Departure: {departure_option['code']}, Lowest Price: {lowest_price if lowest_price else 'N/A'}, Price Selection ID: {price_selection_id}, selected_price: {selected_price}"
                 )
