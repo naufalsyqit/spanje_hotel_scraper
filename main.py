@@ -47,6 +47,6 @@ if __name__ == "__main__":
     hotel_final_data = collector.run_pipeline()
 
     with open(
-        f"output/final_hotel_data_{month_count}_months.json", "w", encoding="utf-8"
+        f"output/tui_formentera_hotel_data_{month_count}_months.json", "w", encoding="utf-8"
     ) as file:
         json.dump(hotel_final_data, file, indent=4, ensure_ascii=False)
