@@ -1,5 +1,3 @@
-import json
-import time
 import logging
 
 from curl_cffi import requests
@@ -11,7 +9,6 @@ from extractor.hotel_extractor import (
     get_hotel_basic_info,
     get_masterdata_id,
     get_hotel_cookies,
-    get_hotels,
     get_hotel_price_grid,
     get_hotel_price_details,
 )

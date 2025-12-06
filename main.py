@@ -1,22 +1,8 @@
 import json
-import time
 import logging
 
-from curl_cffi import requests
-from bs4 import BeautifulSoup
-from extractor.hotel_extractor import (
-    get_trip_options,
-    get_departure_options,
-    get_date_options,
-    get_hotel_basic_info,
-    get_masterdata_id,
-    get_hotel_cookies,
-    get_hotels,
-    get_hotel_price_grid,
-    get_hotel_price_details,
-)
+from extractor.hotel_extractor import get_hotels
 from pipeline.crawl import Crawl
-from helpers.general_utils import decode_and_soup
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
