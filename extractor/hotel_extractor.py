@@ -1,5 +1,6 @@
 import json
 import time
+import logging
 
 from bs4 import BeautifulSoup
 from helpers.general_utils import decode_and_soup
@@ -30,7 +31,7 @@ def get_hotel_price_grid(target_url, cookie_string, payload, hotel_session):
     }
     response = hotel_session.post(target_url, data=payload, headers=headers)
     if response.status_code != 200:
-        print(f"Failed to fetch price grid: {response.status_code}")
+        logging.info(f"Failed to fetch price grid: {response.status_code}")
         return None
     response_json = response.json()
     price_html = response_json["pricegrid"]
@@ -54,7 +55,7 @@ def get_hotels(target_url, base_url):
     for hotel in hotel_list:
         hotel_link = hotel.find("a")["href"]
         hotel_links.append(f"{base_url}{hotel_link}")
-    print(hotel_links)
+    logging.info(hotel_links)
     # print(len(hotel_list))
     return hotel_links
 
@@ -172,7 +173,7 @@ def get_hotel_basic_info(hotel_soup):
         hotel_info["hotel_stars"] = hotel_stars
         hotel_info["accomodation_type"] = "Hotel"
     except Exception as e:
-        print(f"Error extracting stars for {hotel_name}: {e}")
+        logging.error(f"Error extracting stars for {hotel_name}: {e}")
         hotel_info["accomodation_type"] = star_elements[0].get_text().strip()
 
     return hotel_info

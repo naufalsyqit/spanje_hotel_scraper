@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+import os
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from extractor.hotel_extractor import get_hotels
@@ -27,17 +28,20 @@ class Collector:
         logging.info(f"Starting crawling with {self.max_workers} workers")
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {executor.submit(self.crawl.crawl_hotels, link): link for link in hotel_links}
+            futures = {
+                executor.submit(self.crawl.crawl_hotels, link): link
+                for link in hotel_links
+            }
             for future in as_completed(futures):
                 hotel_link = futures[future]
                 try:
                     hotel_data = future.result()
                     hotel_final_data.extend(hotel_data)
                     logging.info(f"Successfully processed: {hotel_link}")
-                    time.sleep(10) # Respectful delay between requests
+                    time.sleep(10)  # Respectful delay between requests
                 except Exception as e:
                     logging.error(f"Error processing {hotel_link}: {e}")
-        
+
         return hotel_final_data
 
 
@@ -49,9 +53,10 @@ if __name__ == "__main__":
     collector.max_workers = max_workers
     hotel_final_data = collector.run_pipeline()
 
-    with open(
-        f"output/tui_formentera_hotel_data_{month_count}_months.json",
-        "w",
-        encoding="utf-8",
-    ) as file:
+    file_path = f"output/tui_formentera_hotel_data_{month_count}_months.json"
+
+    # Ensure parent directory exists
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+    with open(file_path, "w", encoding="utf-8") as file:
         json.dump(hotel_final_data, file, indent=4, ensure_ascii=False)
