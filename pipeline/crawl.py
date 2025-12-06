@@ -21,7 +21,7 @@ class Crawl:
         self.pref_change_url = "https://www.tui.nl/data/pricegrid/changepref/"
         self.price_select_url = "https://www.tui.nl/data/pricegrid/priceselect/"
 
-    def crawl_hotels(self, hotel_link):
+    async def crawl_hotels(self, hotel_link):
         hotel_data = []
         date_options = []
         departure_options = []
@@ -32,7 +32,7 @@ class Crawl:
             "hotel_stars": "",
         }
         hotel_session = requests.Session()
-        cookie_string, price_grid_html = get_hotel_cookies(hotel_link)
+        cookie_string, price_grid_html = await get_hotel_cookies(hotel_link)
         price_grid_soup = BeautifulSoup(price_grid_html, "lxml")
         date_options = get_date_options(price_grid_soup)
         departure_options = get_departure_options(price_grid_soup)

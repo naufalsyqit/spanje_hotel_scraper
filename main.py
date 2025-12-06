@@ -1,8 +1,7 @@
 import json
 import logging
-import time
+import asyncio
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from extractor.hotel_extractor import get_hotels
 from pipeline.crawl import Crawl
 
@@ -19,26 +18,33 @@ class Collector:
         self.crawl = Crawl(month_count=month_count)
         self.max_workers = 5  # Default max workers for ThreadPoolExecutor if not set
 
-    def run_pipeline(self):
-        logging.info("Starting pipeline run")
+    async def run_pipeline_async(self):
+        logging.info("Starting async pipeline run with 10 concurrent workers")
         logging.info("collect hotel links")
         hotel_links = get_hotels(self.target_url, self.base_url)
         hotel_final_data = []
-        logging.info(f"Starting crawling with {self.max_workers} workers")
-
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {executor.submit(self.crawl.crawl_hotels, link): link for link in hotel_links}
-            for future in as_completed(futures):
-                hotel_link = futures[future]
+        
+        # Create semaphore to limit to 10 concurrent crawls
+        semaphore = asyncio.Semaphore(10)
+        
+        async def crawl_with_semaphore(hotel_link):
+            async with semaphore:
                 try:
-                    hotel_data = future.result()
-                    hotel_final_data.extend(hotel_data)
+                    hotel_data = await self.crawl.crawl_hotels(hotel_link)
                     logging.info(f"Successfully processed: {hotel_link}")
-                    time.sleep(10) # Respectful delay between requests
+                    return hotel_data
                 except Exception as e:
                     logging.error(f"Error processing {hotel_link}: {e}")
+                    return []
+        
+        results = await asyncio.gather(*[crawl_with_semaphore(link) for link in hotel_links])
+        for result in results:
+            hotel_final_data.extend(result)
         
         return hotel_final_data
+
+    def run_pipeline(self):
+        return asyncio.run(self.run_pipeline_async())
 
 
 if __name__ == "__main__":

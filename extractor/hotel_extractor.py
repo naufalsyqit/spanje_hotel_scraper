@@ -1,9 +1,10 @@
 import json
 import time
+import asyncio
 
 from bs4 import BeautifulSoup
 from helpers.general_utils import decode_and_soup
-from camoufox.sync_api import Camoufox
+from camoufox.async_api import AsyncCamoufox
 from curl_cffi import requests
 
 
@@ -59,41 +60,33 @@ def get_hotels(target_url, base_url):
     return hotel_links
 
 
-def get_hotel_cookies(hotel_link):
-    with Camoufox(humanize=True, headless=True) as browser:
-        context = browser.new_context(
+async def get_hotel_cookies(hotel_link):
+    async with AsyncCamoufox(humanize=True, headless=True) as browser:
+        context = await browser.new_context(
             viewport={"width": 1920, "height": 1080},
             screen={"width": 1920, "height": 1080},
         )
-        page = context.new_page()
-        page.goto(hotel_link)
-        page.wait_for_selector("#pricegrid", state="attached")
-        page.locator("#pricegrid").scroll_into_view_if_needed()
-        page.wait_for_selector("#prijzen", state="visible")
-        page.locator("#prijzen").scroll_into_view_if_needed()
-        time.sleep(2)
+        page = await context.new_page()
+        await page.goto(hotel_link)
+        await page.wait_for_selector("#pricegrid", state="attached")
+        await page.locator("#pricegrid").scroll_into_view_if_needed()
+        await page.wait_for_selector("#prijzen", state="visible")
+        await page.locator("#prijzen").scroll_into_view_if_needed()
+        await asyncio.sleep(2)
         # get cookies
-        cookies = context.cookies()
+        cookies = await context.cookies()
         # Convert cookies (list of dicts) to cookie string
         cookie_string = "; ".join(
             [f"{cookie['name']}={cookie['value']}" for cookie in cookies]
         )
-        html = page.content()
+        html = await page.content()
+        await context.close()
         return cookie_string, html
 
 
 def get_departure_options(price_grid_soup):
-    get_date_options = price_grid_soup.find(
-        "select", id="pricegridselectDropdownDepartureDate"
-    )
-    get_date_options = get_date_options.find_all("option")
     get_departure_options = price_grid_soup.find("span", class_="departure-from")
     get_departure_options = get_departure_options.find_all("input")
-    date_options = [
-        {"text": option.text, "value": option["value"]}
-        for option in get_date_options
-        if option["value"] != ""
-    ]
     departure_options = [
         {"name": input.find_next("label").text, "code": input["value"]}
         for input in get_departure_options
