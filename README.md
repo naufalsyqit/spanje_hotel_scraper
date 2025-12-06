@@ -199,7 +199,7 @@ Failed requests are logged and the pipeline continues processing other hotels.
 
 1. **Reduce Month Count**: Set `month_count` to a smaller value to speed up scraping
 2. **Limit Hotels**: Modify `hotel_links[:count]` to scrape fewer hotels
-3. **Parallel Processing**: Consider using ThreadPoolExecutor for multiple hotels (future enhancement, needs security measurement)
+3. **Parallel Processing**: Consider using ThreadPoolExecutor for faster scraping
 
 ## Limitations
 
@@ -209,11 +209,11 @@ Failed requests are logged and the pipeline continues processing other hotels.
 - Website structure changes may break the scraper
 - all using 2 person options
 - Meal plan kept greyed out to select
+- not every line of code exception are excepted due to possible misleading blocker
 
 ## Future Enhancements
 
 - [ ] Support for multiple destinations
-- [ ] Parallel hotel processing with ThreadPoolExecutor (need further inspect on the security as per now rotational IP kept getting blocked)
 - [ ] Database storage option
 - [ ] Async/await implementation for camoufox cookies collector
 
