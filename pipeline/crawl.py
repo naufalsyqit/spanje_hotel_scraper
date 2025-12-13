@@ -94,7 +94,7 @@ class Crawl:
         for departure_option in departure_options:
             price_grid_found = False
             hotel_info["departure_airport"] = departure_option["name"]
-            for date_option in date_options[:month_count]:
+            for index, date_option in enumerate(date_options[:month_count]):
                 if price_grid_found:
                     break
                 hotel_info.update(
@@ -212,7 +212,7 @@ class Crawl:
                             logging.warning("Failed to fetch next page")
                             break
                         if not limit_weeks:
-                            limit_weeks = len(date_options) * 4
+                            limit_weeks = (len(date_options) - index) * 4
                             logging.info(f"No week limit, keep going until the end {limit_weeks}")
                         logging.info(f"Weeks remaining: {limit_weeks - 1}")
                         limit_weeks -= 1
