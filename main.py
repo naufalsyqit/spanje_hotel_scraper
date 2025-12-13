@@ -51,7 +51,7 @@ if __name__ == "__main__":
     start_time = time.time()
     logging.info(f"Starting the hotel data extraction process {start_time}")
     month_count = 3  # Set to 0 to check all months
-    max_workers = 5  # set to 1 to disable multithreading
+    max_workers = 10  # set to 1 to disable multithreading
     max_weeks = 0 # set to 0 to disable week limit and will scrape the whole available days on weeks
 
     collector = Collector(month_count=month_count, max_weeks=max_weeks)

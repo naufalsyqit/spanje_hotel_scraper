@@ -212,8 +212,8 @@ class Crawl:
                             logging.warning("Failed to fetch next page")
                             break
                         if not limit_weeks:
-                            logging.info("No week limit, keep going until the end")
-                            continue
+                            limit_weeks = len(date_options) * 4
+                            logging.info(f"No week limit, keep going until the end {limit_weeks}")
                         logging.info(f"Weeks remaining: {limit_weeks - 1}")
                         limit_weeks -= 1
                 except Exception as e:
