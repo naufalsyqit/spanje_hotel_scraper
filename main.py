@@ -57,6 +57,7 @@ if __name__ == "__main__":
     collector = Collector(month_count=month_count, max_weeks=max_weeks)
     collector.max_workers = max_workers
     hotel_final_data = collector.run_pipeline()
+    hotel_final_data = list(set(hotel_final_data))
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_path = f"output/tui_formentera_hotel_data_{month_count}_months_{datetime_str}.json"
 
