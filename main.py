@@ -57,7 +57,15 @@ if __name__ == "__main__":
     collector = Collector(month_count=month_count, max_weeks=max_weeks)
     collector.max_workers = max_workers
     hotel_final_data = collector.run_pipeline()
-    hotel_final_data = list(set(hotel_final_data))
+    seen = {}
+    unique_data = []
+    for item in hotel_final_data:
+        # Use a unique key (e.g., hotel_url + departure_airport)
+        key = (item.get('hotel_url'), item.get('departure_airport'), item.get('departure_date'))
+        if key not in seen:
+            seen[key] = True
+            unique_data.append(item)
+    hotel_final_data = unique_data
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_path = f"output/tui_formentera_hotel_data_{month_count}_months_{datetime_str}.json"
 
