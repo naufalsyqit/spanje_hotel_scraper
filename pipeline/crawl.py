@@ -25,7 +25,7 @@ class Crawl:
         self.price_select_url = "https://www.tui.nl/data/pricegrid/priceselect/"
         self.next_page_url = "https://www.tui.nl/data/pricegrid/gridnavigation/"
         self.limit_weeks = 5
-        self.max_workers = 6
+        self.max_workers = 5
     
     def process_price_option(self, price_option, hotel_info, payload_extension, cookie_string, hotel_session):
         """Process a single price option and return hotel data"""
