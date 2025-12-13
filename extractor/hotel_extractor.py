@@ -29,7 +29,8 @@ def get_hotel_price_grid(target_url, cookie_string, payload, hotel_session):
         "x-requested-with": "XMLHttpRequest",
         "Cookie": cookie_string,
     }
-    response = hotel_session.post(target_url, data=payload, headers=headers)
+    hotel_session.headers.update(headers)
+    response = hotel_session.post(target_url, data=payload)
     if response.status_code != 200:
         logging.info(f"Failed to fetch price grid: {response.status_code}")
         return None
@@ -81,6 +82,41 @@ def get_hotel_cookies(hotel_link):
         )
         html = page.content()
         return cookie_string, html
+    
+
+def get_hotel_cookies_alt(hotel_link):
+    session = requests.Session()
+    session.impersonate = "chrome120"
+    hotel_basic = session.get(hotel_link)
+    cookies = session.cookies.items()
+    # Get cookies from session
+    cookie_string = "; ".join([f"{name}={value}" for name, value in cookies])
+    hotel_basic_soup = BeautifulSoup(hotel_basic.text, "lxml")
+    price_grid_section = hotel_basic_soup.find("section", class_="pricegrid")
+    target_element = price_grid_section.find("section", class_="wd-remove")
+    master_entity_type = target_element["data-viewedobjectmasterdatatype"]
+    master_entity_id = target_element["data-viewedobjectmasterdataid"]
+    payload = f"masterentitytype={master_entity_type}&masterentityid={master_entity_id}&theme=-1&isSale=false&destination=Spanje&firstview=true"
+    
+    headers = {
+        'accept': 'text/html, */*; q=0.01',
+        'accept-language': 'en-US,en;q=0.9',
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'origin': 'https://www.tui.nl',
+        'priority': 'u=1, i',
+        'referer': hotel_link,
+        'sec-ch-ua': '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+        'x-requested-with': 'XMLHttpRequest',
+        'Cookie': cookie_string,
+    }
+    response = session.post("https://www.tui.nl/data/pricegrid/renderprefsandgridinitially/?clearprices=1", data=payload, headers=headers)
+    return cookie_string, hotel_basic.text, response.text, session
 
 
 def get_departure_options(price_grid_soup):
@@ -128,7 +164,11 @@ def get_trip_options(price_details_json):
     hotel_info["tourist_tax"] = tourist_tax
     g4entry = json.loads(price_details_json["ga4Entry"])["GA4"]["ecommerce"]
     flight_details = g4entry["items"][1]
-    price_jump = json.loads(price_details_json["priceJump"])["GA4"]["priceJump"]
+    # try:
+    #     price_jump = json.loads(price_details_json["priceJump"])["GA4"]["priceJump"]
+    # except Exception as e:
+    #     logging.error(f"Error parsing price jump data: {e}")
+    #     price_jump = {}
     # print(g4entry)
     # quit()
     hotel_info["room_name"] = g4entry["items"][0].get("item_variant", "")
@@ -141,7 +181,7 @@ def get_trip_options(price_details_json):
         "departure_time_outbound", ""
     )
     hotel_info["flight_arrival_time"] = flight_details.get("arrival_time_outbound", "")
-    hotel_info["flight_airline"] = price_jump.get("carrier", "")
+    hotel_info["flight_airline"] = price_grid_soup.find("span", class_="trnsprt").get_text().strip()
     return hotel_info
 
 

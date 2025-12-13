@@ -21,6 +21,8 @@ This project automates the collection of hotel data from TUI Netherlands, includ
 - 📊 **Structured Output**: Exports data to JSON format
 - 🛡️ **Anti-Detection**: Implements browser impersonation to bypass detection
 - 📝 **Logging**: Comprehensive logging for debugging and monitoring
+- ⚡ **Multithreading**: Concurrent processing with ThreadPoolExecutor (10 hotels + 5 price options per thread)
+- 🔁 **Pagination Support**: Automatically navigates through multiple price pages
 
 ## Installation
 
@@ -118,18 +120,21 @@ hotel_scrapers/
 
 ## How It Works
 
-1. **Hotel Discovery**: Fetches the list of hotels from TUI's Formentera page
-2. **Session Management**: Uses Camoufox to obtain authenticated cookies
+1. **Hotel Discovery**: Fetches the list of hotels from TUI's Formentera page using curl_cffi
+2. **Session Management**: Uses new cffi requests session to obtain authenticated cookies
 3. **Price Grid Retrieval**: Fetches price grids for different departure airports and dates
-4. **Data Extraction**: Parses HTML to extract prices, flight info, and hotel details
-5. **Price Details**: Gets detailed pricing information including taxes and breakdowns
-6. **Data Export**: Saves structured data to JSON format
+4. **Pagination**: Automatically navigates through multiple price pages using the grid navigation API
+5. **Price Extraction**: Parses HTML to extract all price options for each date/airport combination
+6. **Multithreaded Processing**: Processes multiple price options concurrently (5 threads)
+7. **Price Details**: Gets detailed pricing information including taxes, flight details, and room info
+8. **Data Export**: Saves structured data to JSON format with timestamp
 
 ## API Endpoints Used
 
 - `https://www.tui.nl/reizen/spanje/formentera/` - Hotel listing page
-- `https://www.tui.nl/data/pricegrid/changepref/` - Price grid API
-- `https://www.tui.nl/data/pricegrid/priceselect/` - Price details API
+- `https://www.tui.nl/data/pricegrid/changepref/` - Price grid preference change API
+- `https://www.tui.nl/data/pricegrid/priceselect/` - Price details selection API
+- `https://www.tui.nl/data/pricegrid/gridnavigation/` - Price grid pagination API
 
 ## Output Format
 
@@ -162,10 +167,19 @@ The scraper exports data in the following JSON structure:
 ## Key Functions
 
 ### `Collector.run_pipeline()`
-Main pipeline that orchestrates the scraping process.
+Main pipeline orchestrator that manages the entire scraping workflow with multithreading support.
+
+### `Crawl.crawl_hotels(hotel_link)`
+Processes a single hotel, handling all date/airport combinations and pagination.
+
+### `Crawl.process_price_option(price_option, ...)`
+Processes individual price options concurrently (multithreaded).
 
 ### `get_hotel_cookies(hotel_link)`
-Uses Camoufox to retrieve session cookies and page content.
+Uses Camoufox to retrieve session cookies and initial page content.
+
+### `get_hotel_cookies_alt(hotel_link)`
+Uses clean cffi requests session to retrieve session cookies and initial page content.
 
 ### `get_hotel_basic_info(soup)`
 Extracts hotel name and star rating from parsed HTML.
@@ -174,48 +188,68 @@ Extracts hotel name and star rating from parsed HTML.
 Fetches price grid data for a specific hotel, departure date, and airport.
 
 ### `get_trip_options(price_details_json)`
-Extracts trip details (flights, pricing, dates) from API response.
+Extracts trip details (flights, pricing, dates) from API response JSON.
+
+### `decode_and_soup(html_string)`
+Decodes escaped HTML and returns BeautifulSoup object for parsing.
 
 ## Logging
 
-The scraper uses Python's `logging` module. Logs are printed to console with timestamps and severity levels:
+The scraper uses Python's `logging` module with detailed output. Logs are printed to console with timestamps and severity levels:
 
 ```
-2025-12-06 10:30:45,123 - INFO - Processing hotel: example-hotel, Departure: AMS, Date: June 1-7
-2025-12-06 10:30:50,456 - INFO - Hotel: example-hotel, Departure: AMS, Lowest Price: €1,299
+2025-12-06 10:30:45,123 [INFO] main.py:45 - Processing hotel: example-hotel, Departure: AMS, Date: June 1-7
+2025-12-06 10:30:50,456 [INFO] crawl.py:125 - Hotel: example-hotel, Departure: AMS, Lowest Price: €1,299
+2025-12-06 10:30:55,789 [ERROR] crawl.py:150 - Error processing price option: Connection timeout
 ```
+
+**Log levels:**
+- `INFO` - Normal operation flow
+- `ERROR` - Errors in processing (logged but doesn't stop execution)
+- `WARNING` - Potential issues (e.g., empty responses)
 
 ## Error Handling
 
-The scraper includes error handling for:
-- Missing HTML elements
-- API failures
-- Network timeouts
-- Invalid data formats
+The scraper includes robust error handling for:
+- Missing HTML elements (gracefully skips and logs)
+- API failures and empty responses (caught and logged)
+- Network timeouts (retries or skips hotel)
+- Invalid data formats (uses try-except blocks)
+- Empty pagination pages (breaks loop automatically)
+- Failed price option processing (logs error, continues with next option)
 
-Failed requests are logged and the pipeline continues processing other hotels.
+Failed requests are logged with detailed error messages and the pipeline continues processing other hotels or price options.
 
 ## Performance Tips
 
 1. **Reduce Month Count**: Set `month_count` to a smaller value to speed up scraping
-2. **Limit Hotels**: Modify `hotel_links[:count]` to scrape fewer hotels
-3. **Parallel Processing**: Consider using ThreadPoolExecutor for faster scraping
+2. **Adjust Thread Workers**: Modify `max_workers` in main.py for hotel processing (default: 10)
+3. **Adjust Price Option Threads**: Modify `max_workers=5` in crawl.py for price option processing
+4. **Rate Limiting**: Add delays between requests to avoid server blocking
+5. **Limit Hotels**: Modify hotel_links slice to scrape fewer hotels for testing
 
 ## Limitations
 
-- Currently scrapes only the Formentera destination (if flows are completely the same, it'll just need a modification on the url)
+- Currently scrapes only the Formentera destination (easily adaptable to other destinations)
 - Requires active internet connection
 - TUI may have rate limiting - add delays if needed
 - Website structure changes may break the scraper
-- all using 2 person options
-- Meal plan kept greyed out to select
-- not every line of code exception are excepted due to possible misleading blocker
+- All prices based on 2 person options
+- Meal plan kept greyed out to select (limitation of website)
+- Not all code branches have exception handling due to possible misleading blockers
+- Headless browser automation may be slower than pure HTTP requests
+- Some price details may not be available for all hotels/dates
 
 ## Future Enhancements
 
 - [ ] Support for multiple destinations
-- [ ] Database storage option
-- [ ] Async/await implementation for camoufox cookies collector
+- [ ] Database storage option (MongoDB/PostgreSQL)
+- [ ] Async/await implementation for faster Camoufox cookie collection
+- [ ] Proxy rotation support for large-scale scraping
+- [ ] Email notifications for price drops
+- [ ] Scheduled scraping with cron jobs
+- [ ] Web dashboard for monitoring scraping progress
+- [ ] Price comparison and analysis features
 
 ## Disclaimer
 
